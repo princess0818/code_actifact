@@ -1,0 +1,1421 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>數學勇士：符號大冒險 - Math Warrior</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 FontAwesome 圖標 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts 字型 -->
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans TC', 'Share Tech Mono', monospace;
+            user-select: none;
+            overflow: hidden;
+            background-color: #080710;
+        }
+        canvas {
+            image-rendering: pixelated;
+        }
+        .neon-text-blue {
+            text-shadow: 0 0 8px rgba(59, 130, 246, 0.8), 0 0 15px rgba(59, 130, 246, 0.4);
+        }
+        .neon-text-gold {
+            text-shadow: 0 0 8px rgba(234, 179, 8, 0.8), 0 0 15px rgba(234, 179, 8, 0.4);
+        }
+        .neon-border {
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.25);
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(8, 7, 16, 0.8);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #3b82f6;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="w-screen h-screen flex flex-col items-center justify-center text-white select-none overflow-hidden p-0 md:p-4">
+
+    <!-- 遊戲主容器 -->
+    <div class="relative w-full h-full max-w-7xl max-h-[850px] bg-slate-950 md:rounded-3xl border border-slate-800 overflow-hidden flex flex-col md:flex-row shadow-2xl">
+        
+        <!-- 左側/上方：遊戲畫布區域 -->
+        <div class="relative flex-grow h-full overflow-hidden bg-slate-950 flex items-center justify-center">
+            <!-- 遊戲畫布 -->
+            <canvas id="gameCanvas" class="absolute top-0 left-0 w-full h-full block cursor-crosshair"></canvas>
+            
+            <!-- 頂部狀態與進度資訊列 -->
+            <div class="absolute top-4 left-4 right-4 flex justify-between items-center pointer-events-none z-10 flex-wrap gap-2">
+                <!-- 玩家血量與經驗值 -->
+                <div class="flex items-center space-x-3 bg-slate-900/95 border border-slate-700/60 px-4 py-2 rounded-xl backdrop-blur-sm shadow-lg pointer-events-auto">
+                    <div class="flex flex-col">
+                        <div class="flex items-center space-x-2">
+                            <span class="text-xs text-rose-400 font-bold tracking-wider uppercase">HP</span>
+                            <div class="w-28 md:w-36 bg-slate-800 h-3.5 rounded-full overflow-hidden border border-slate-700 relative">
+                                <div id="hpBar" class="bg-gradient-to-r from-red-500 to-rose-500 h-full w-full transition-all duration-100"></div>
+                                <span id="hpText" class="absolute inset-0 text-[10px] font-bold text-center leading-3">100/100</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2 mt-1">
+                            <span class="text-xs text-yellow-400 font-bold tracking-wider uppercase">EXP</span>
+                            <div class="w-28 md:w-36 bg-slate-800 h-2 rounded-full overflow-hidden border border-slate-700 relative">
+                                <div id="expBar" class="bg-gradient-to-r from-yellow-400 to-amber-500 h-full w-0 transition-all duration-100"></div>
+                            </div>
+                            <span id="levelText" class="text-[10px] text-yellow-400 font-bold font-mono">Lv.1</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 戰役進度 -->
+                <div class="flex items-center space-x-4 bg-slate-900/95 border border-slate-700/60 px-4 py-2 rounded-xl backdrop-blur-sm shadow-lg font-mono pointer-events-auto">
+                    <div class="text-center">
+                        <div class="text-[9px] text-slate-400 uppercase tracking-wider">波次 (Wave)</div>
+                        <div id="waveText" class="text-lg font-black text-emerald-400">1</div>
+                    </div>
+                    <div class="h-6 w-px bg-slate-700"></div>
+                    <div class="text-center">
+                        <div class="text-[9px] text-slate-400 uppercase tracking-wider">分數</div>
+                        <div id="scoreText" class="text-lg font-black text-blue-400">0</div>
+                    </div>
+                    <div class="h-6 w-px bg-slate-700"></div>
+                    <div class="text-center">
+                        <div class="text-[9px] text-slate-400 uppercase tracking-wider">數字魔物</div>
+                        <div id="enemyCountText" class="text-lg font-black text-amber-500">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 行動裝置輔助控制與提示 -->
+            <div id="touchControls" class="absolute bottom-4 left-4 right-4 flex justify-between items-end pointer-events-none md:hidden z-20">
+                <!-- 移動搖桿區域 -->
+                <div id="joystickZone" class="w-24 h-24 bg-slate-900/70 border border-slate-700/80 rounded-full flex items-center justify-center pointer-events-auto relative active:scale-95 transition-transform">
+                    <div id="joystickKnob" class="w-8 h-8 bg-blue-500/80 rounded-full shadow-lg border border-white/20 transition-all duration-75"></div>
+                </div>
+                <!-- 自動瞄準與輔助工具 -->
+                <button onclick="toggleAutoAim()" class="bg-slate-900/90 hover:bg-slate-800 border border-slate-700 px-3 py-2 rounded-xl pointer-events-auto flex items-center gap-1.5 text-xs text-slate-300">
+                    <span id="autoAimBtn" class="text-emerald-400"><i class="fas fa-crosshairs"></i> 自動瞄準: 開</span>
+                </button>
+            </div>
+
+            <!-- 浮動方程式教學引導 -->
+            <div id="tutorialOverlay" class="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-slate-900/95 border border-slate-700/80 px-5 py-3 rounded-2xl text-center pointer-events-none transition-opacity duration-500 z-10 max-w-sm">
+                <p class="text-xs text-blue-400 font-bold mb-1"><i class="fas fa-keyboard mr-1"></i> 數學作戰核心指南</p>
+                <p class="text-[11px] text-slate-300">1. 目標：將怪物的數字<b>計算至剛好 0</b> 即可消滅！</p>
+                <p class="text-[11px] text-slate-300">2. 用 <b>[+]</b> 湊成完全平方數（如 9, 25, 49），再用 <b>[√]</b> 降維打擊！</p>
+                <p class="text-[11px] text-yellow-400 mt-1">3. 用 <b>[∑]</b> 連射兩隻怪物，將牠們融合加總成新數字！</p>
+            </div>
+        </div>
+
+        <!-- 右側：武器面板、說明、策略提示 -->
+        <div class="w-full md:w-80 bg-slate-900 border-t md:border-t-0 md:border-l border-slate-800 p-4 flex flex-col justify-between overflow-y-auto max-h-[45%] md:max-h-full">
+            <div>
+                <!-- 標題與音效 -->
+                <div class="flex justify-between items-center mb-4">
+                    <h1 class="text-lg font-black tracking-wider text-blue-400 flex items-center gap-2">
+                        <i class="fa-solid fa-square-root-variable"></i> 數學代數勇士
+                    </h1>
+                    <button id="soundToggle" class="text-slate-400 hover:text-white transition-colors bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded-lg text-xs flex items-center gap-1">
+                        <i id="soundIcon" class="fas fa-volume-up"></i> 音效: 開
+                    </button>
+                </div>
+
+                <!-- 武器選單列表 -->
+                <div class="space-y-1.5" id="weaponList">
+                    <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 px-1 flex justify-between">
+                        <span>選擇數學武器 [按鍵 1-6]</span>
+                        <span class="text-blue-400">目前選擇</span>
+                    </div>
+                    
+                    <!-- 加法 Weapon -->
+                    <button onclick="selectWeapon(0)" id="wpBtn-0" class="w-full text-left bg-slate-800/80 border-2 border-blue-500 p-2 rounded-xl transition-all duration-150 flex items-center justify-between">
+                        <div class="flex items-center space-x-2.5">
+                            <span class="w-7 h-7 rounded-lg bg-blue-500/20 text-blue-400 font-black flex items-center justify-center text-base border border-blue-500/30">＋</span>
+                            <div>
+                                <h3 class="text-xs font-bold text-white">加法脈衝彈 (+)</h3>
+                                <p class="text-[9px] text-slate-400">數字 +1。策略湊平方數用</p>
+                            </div>
+                        </div>
+                        <span class="text-[10px] font-mono font-bold px-1.5 py-0.5 bg-blue-500/20 text-blue-300 rounded border border-blue-500/40">1</span>
+                    </button>
+
+                    <!-- 減法 Weapon -->
+                    <button onclick="selectWeapon(1)" id="wpBtn-1" class="w-full text-left bg-slate-800/50 hover:bg-slate-700/80 border-2 border-transparent p-2 rounded-xl transition-all duration-150 flex items-center justify-between">
+                        <div class="flex items-center space-x-2.5">
+                            <span class="w-7 h-7 rounded-lg bg-rose-500/20 text-rose-400 font-black flex items-center justify-center text-base border border-rose-500/30">－</span>
+                            <div>
+                                <h3 class="text-xs font-bold text-white">減法衰變刃 (-)</h3>
+                                <p class="text-[9px] text-slate-400">數字 -1。歸零消滅敵人的必殺技</p>
+                            </div>
+                        </div>
+                        <span class="text-[10px] font-mono font-bold px-1.5 py-0.5 bg-slate-800 text-slate-400 rounded border border-slate-700">2</span>
+                    </button>
+
+                    <!-- 乘法 Weapon -->
+                    <button onclick="selectWeapon(2)" id="wpBtn-2" class="w-full text-left bg-slate-800/50 hover:bg-slate-700/80 border-2 border-transparent p-2 rounded-xl transition-all duration-150 flex items-center justify-between">
+                        <div class="flex items-center space-x-2.5">
+                            <span class="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-400 font-black flex items-center justify-center text-sm border border-amber-500/30">×2</span>
+                            <div>
+                                <h3 class="text-xs font-bold text-white">乘法倍增器 (×)</h3>
+                                <p class="text-[9px] text-slate-400">數字 2倍。快速調整大數字區間</p>
+                            </div>
+                        </div>
+                        <span class="text-[10px] font-mono font-bold px-1.5 py-0.5 bg-slate-800 text-slate-400 rounded border border-slate-700">3</span>
+                    </button>
+
+                    <!-- 平方 Weapon -->
+                    <button onclick="selectWeapon(3)" id="wpBtn-3" class="w-full text-left bg-slate-800/50 hover:bg-slate-700/80 border-2 border-transparent p-2 rounded-xl transition-all duration-150 flex items-center justify-between">
+                        <div class="flex items-center space-x-2.5">
+                            <span class="w-7 h-7 rounded-lg bg-purple-500/20 text-purple-400 font-black flex items-center justify-center text-xs border border-purple-500/30">x²</span>
+                            <div>
+                                <h3 class="text-xs font-bold text-white">平方共振砲 (x²)</h3>
+                                <p class="text-[9px] text-slate-400">數字平方化。可做大規模數字變量</p>
+                            </div>
+                        </div>
+                        <span class="text-[10px] font-mono font-bold px-1.5 py-0.5 bg-slate-800 text-slate-400 rounded border border-slate-700">4</span>
+                    </button>
+
+                    <!-- 根號 Weapon -->
+                    <button onclick="selectWeapon(4)" id="wpBtn-4" class="w-full text-left bg-slate-800/50 hover:bg-slate-700/80 border-2 border-transparent p-2 rounded-xl transition-all duration-150 flex items-center justify-between">
+                        <div class="flex items-center space-x-2.5">
+                            <span class="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 font-black flex items-center justify-center text-sm border border-emerald-500/30">√x</span>
+                            <div>
+                                <h3 class="text-xs font-bold text-white">根號開方光束 (√)</h3>
+                                <p class="text-[9px] text-slate-400">數字開根號。對大怪實施極速削減！</p>
+                            </div>
+                        </div>
+                        <span class="text-[10px] font-mono font-bold px-1.5 py-0.5 bg-slate-800 text-slate-400 rounded border border-slate-700">5</span>
+                    </button>
+
+                    <!-- SIGMA Weapon -->
+                    <button onclick="selectWeapon(5)" id="wpBtn-5" class="w-full text-left bg-slate-800/50 hover:bg-slate-700/80 border-2 border-transparent p-2 rounded-xl transition-all duration-150 flex items-center justify-between">
+                        <div class="flex items-center space-x-2.5">
+                            <span class="w-7 h-7 rounded-lg bg-fuchsia-500/20 text-fuchsia-400 font-black flex items-center justify-center text-sm border border-fuchsia-500/30">∑</span>
+                            <div>
+                                <h3 class="text-xs font-bold text-white">西格瑪聚合鏈 (∑)</h3>
+                                <p class="text-[9px] text-slate-400">連射兩隻怪物，將牠們數字加總融合成一體</p>
+                            </div>
+                        </div>
+                        <span class="text-[10px] font-mono font-bold px-1.5 py-0.5 bg-slate-800 text-slate-400 rounded border border-slate-700">6</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 策略提示小抄 (完全平方數列表) -->
+            <div class="mt-4 pt-3 border-t border-slate-800 bg-slate-950/50 p-2.5 rounded-xl">
+                <div class="text-[9px] font-bold text-yellow-400 uppercase tracking-widest mb-1.5"><i class="fas fa-lightbulb mr-1"></i> 代數速查小抄</div>
+                <div class="grid grid-cols-4 gap-1 text-[9px] font-mono text-slate-400 text-center">
+                    <div class="bg-slate-900 p-1 rounded border border-slate-800">2² = <span class="text-yellow-400 font-bold">4</span></div>
+                    <div class="bg-slate-900 p-1 rounded border border-slate-800">3² = <span class="text-yellow-400 font-bold">9</span></div>
+                    <div class="bg-slate-900 p-1 rounded border border-slate-800">4² = <span class="text-yellow-400 font-bold">16</span></div>
+                    <div class="bg-slate-900 p-1 rounded border border-slate-800">5² = <span class="text-yellow-400 font-bold">25</span></div>
+                    <div class="bg-slate-900 p-1 rounded border border-slate-800">6² = <span class="text-yellow-400 font-bold">36</span></div>
+                    <div class="bg-slate-900 p-1 rounded border border-slate-800">7² = <span class="text-yellow-400 font-bold">49</span></div>
+                    <div class="bg-slate-900 p-1 rounded border border-slate-800">8² = <span class="text-yellow-400 font-bold">64</span></div>
+                    <div class="bg-slate-900 p-1 rounded border border-slate-800">9² = <span class="text-yellow-400 font-bold">81</span></div>
+                </div>
+                <p class="text-[8px] text-slate-500 mt-2 text-center">怪物的數字變成「完全平方數」時會發出金光！</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 1. 開場說明畫面 Overlay -->
+    <div id="startOverlay" class="absolute inset-0 bg-slate-950/95 flex flex-col items-center justify-center z-50 p-4 text-center">
+        <div class="max-w-md w-full bg-slate-900 border border-slate-800 p-6 md:p-8 rounded-2xl shadow-2xl neon-border">
+            <div class="w-16 h-16 bg-blue-500/20 text-blue-400 rounded-full flex items-center justify-center text-3xl font-black mb-4 mx-auto border border-blue-500/40 animate-pulse">
+                ∑
+            </div>
+            <h2 class="text-2xl md:text-3xl font-black tracking-wider text-blue-400 mb-2 neon-text-blue">數字與符號大冒險</h2>
+            <p class="text-xs text-slate-400 mb-6">歡迎來到代數維度！這裡的怪物都是帶有數值的「數字魔怪」。你必須使用手中的<b>加、減、乘、除、平方、根號與西格瑪加總</b>武器，將怪物體內的數學代數算至 <span class="text-rose-400 font-bold">精準的 0</span> 來消除牠們！</p>
+            
+            <div class="bg-slate-950/80 p-3.5 rounded-xl text-left border border-slate-800 mb-6 space-y-2 text-xs text-slate-300 font-mono">
+                <div class="flex items-center gap-2"><span class="text-blue-400 font-bold">[1] 加法 (+)</span> 讓怪物數字 +1（可用來湊平方數！）</div>
+                <div class="flex items-center gap-2"><span class="text-rose-400 font-bold">[2] 減法 (-)</span> 讓怪物數字 -1（將數字打到 0 即消滅！）</div>
+                <div class="flex items-center gap-2"><span class="text-amber-400 font-bold">[3] 乘法 (×)</span> 讓怪物數字翻倍 2 倍</div>
+                <div class="flex items-center gap-2"><span class="text-purple-400 font-bold">[4] 平方 (²)</span> 讓怪物數字平方（例如 5 變成 25）</div>
+                <div class="flex items-center gap-2"><span class="text-emerald-400 font-bold">[5] 根號 (√)</span> 開根號。大數字怪物的剋星</div>
+                <div class="flex items-center gap-2"><span class="text-fuchsia-400 font-bold">[6] 西格瑪 (∑)</span> 連射兩隻怪物，將其加總融合為一體！</div>
+            </div>
+
+            <button onclick="startGame()" class="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-lg hover:shadow-blue-500/20 text-sm">
+                進入代數空間 (開始遊戲)
+            </button>
+        </div>
+    </div>
+
+    <!-- 2. 升級選擇天賦 Overlay (Roguelike) -->
+    <div id="upgradeOverlay" class="hidden absolute inset-0 bg-slate-950/90 flex flex-col items-center justify-center z-40 p-4 text-center backdrop-blur-sm">
+        <div class="max-w-lg w-full bg-slate-900 border border-slate-700 p-6 md:p-8 rounded-2xl shadow-2xl">
+            <div class="text-amber-400 text-xs font-bold uppercase tracking-widest mb-1">Level Up!</div>
+            <h2 class="text-xl md:text-2xl font-black text-white mb-6">選擇數學定理進化方向</h2>
+            
+            <div id="upgradeOptions" class="space-y-3 mb-6">
+                <!-- 動態注入升級卡片 -->
+            </div>
+            
+            <p class="text-xs text-slate-500">解鎖新公理，繼續您的求證之旅</p>
+        </div>
+    </div>
+
+    <!-- 3. 遊戲結束/結算 Overlay -->
+    <div id="gameOverOverlay" class="hidden absolute inset-0 bg-slate-950/95 flex flex-col items-center justify-center z-50 p-4 text-center">
+        <div class="max-w-md w-full bg-slate-900 border border-red-950 p-6 md:p-8 rounded-2xl shadow-2xl">
+            <div class="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center text-3xl mb-4 mx-auto border border-red-500/30">
+                <i class="fas fa-skull"></i>
+            </div>
+            <h2 class="text-2xl font-black text-red-500 mb-1">公式解崩潰</h2>
+            <p class="text-[10px] text-slate-400 mb-6 font-mono">Division by Zero or HP Depleted.</p>
+            
+            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 mb-6 grid grid-cols-2 gap-4 text-center">
+                <div>
+                    <div class="text-xs text-slate-500">最終得分</div>
+                    <div id="finalScore" class="text-xl font-black text-blue-400 font-mono">0</div>
+                </div>
+                <div>
+                    <div class="text-xs text-slate-500">生存波次</div>
+                    <div id="finalWave" class="text-xl font-black text-emerald-400 font-mono">1</div>
+                </div>
+            </div>
+
+            <button onclick="restartGame()" class="w-full bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-700 hover:to-rose-800 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-lg text-sm">
+                重組算式 (重新開始)
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // --- 音效系統 (Web Audio API) ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = null;
+        let soundEnabled = true;
+
+        function playSound(type) {
+            if (!soundEnabled) return;
+            try {
+                if (!audioCtx) {
+                    audioCtx = new AudioContext();
+                }
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                const now = audioCtx.currentTime;
+
+                if (type === 'shoot_plus') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(400, now);
+                    osc.frequency.exponentialRampToValueAtTime(700, now + 0.1);
+                    gain.gain.setValueAtTime(0.06, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                    osc.start(now);
+                    osc.stop(now + 0.1);
+                } else if (type === 'shoot_minus') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(300, now);
+                    osc.frequency.exponentialRampToValueAtTime(150, now + 0.12);
+                    gain.gain.setValueAtTime(0.06, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+                    osc.start(now);
+                    osc.stop(now + 0.12);
+                } else if (type === 'shoot_mul') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(440, now);
+                    osc.frequency.linearRampToValueAtTime(880, now + 0.15);
+                    gain.gain.setValueAtTime(0.08, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                    osc.start(now);
+                    osc.stop(now + 0.15);
+                } else if (type === 'shoot_square') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(150, now);
+                    osc.frequency.exponentialRampToValueAtTime(600, now + 0.25);
+                    gain.gain.setValueAtTime(0.12, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+                    osc.start(now);
+                    osc.stop(now + 0.25);
+                } else if (type === 'shoot_sqrt') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(900, now);
+                    osc.frequency.exponentialRampToValueAtTime(300, now + 0.2);
+                    gain.gain.setValueAtTime(0.08, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                    osc.start(now);
+                    osc.stop(now + 0.2);
+                } else if (type === 'shoot_sigma') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(600, now);
+                    osc.frequency.linearRampToValueAtTime(1000, now + 0.12);
+                    gain.gain.setValueAtTime(0.08, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+                    osc.start(now);
+                    osc.stop(now + 0.12);
+                } else if (type === 'sigma_link') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(500, now);
+                    osc.frequency.linearRampToValueAtTime(250, now + 0.08);
+                    gain.gain.setValueAtTime(0.08, now);
+                    osc.start(now);
+                    osc.stop(now + 0.08);
+                } else if (type === 'sigma_merge') {
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(180, now);
+                    osc.frequency.exponentialRampToValueAtTime(440, now + 0.35);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+                    osc.start(now);
+                    osc.stop(now + 0.35);
+                } else if (type === 'perfect_square') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(523.25, now); // C5
+                    osc.frequency.setValueAtTime(659.25, now + 0.08); // E5
+                    osc.frequency.setValueAtTime(783.99, now + 0.16); // G5
+                    gain.gain.setValueAtTime(0.08, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+                } else if (type === 'hit') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(120, now);
+                    osc.frequency.linearRampToValueAtTime(40, now + 0.08);
+                    gain.gain.setValueAtTime(0.08, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+                    osc.start(now);
+                    osc.stop(now + 0.08);
+                } else if (type === 'hurt') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(180, now);
+                    osc.frequency.linearRampToValueAtTime(40, now + 0.25);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+                    osc.start(now);
+                    osc.stop(now + 0.25);
+                } else if (type === 'level_up') {
+                    const freqs = [261.63, 329.63, 392.00, 523.25]; // C4 E4 G4 C5
+                    freqs.forEach((f, index) => {
+                        const tOsc = audioCtx.createOscillator();
+                        const tGain = audioCtx.createGain();
+                        tOsc.type = 'sine';
+                        tOsc.frequency.setValueAtTime(f, now + index * 0.07);
+                        tGain.gain.setValueAtTime(0.08, now + index * 0.07);
+                        tGain.gain.exponentialRampToValueAtTime(0.01, now + index * 0.07 + 0.15);
+                        tOsc.connect(tGain);
+                        tGain.connect(audioCtx.destination);
+                        tOsc.start(now + index * 0.07);
+                        tOsc.stop(now + index * 0.07 + 0.15);
+                    });
+                }
+            } catch (e) {
+                console.log("Audio play failed or context blocked", e);
+            }
+        }
+
+        // --- 全局遊戲狀態與配置 ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        const GAME_STATE = {
+            MENU: 'menu',
+            PLAYING: 'playing',
+            UPGRADE: 'upgrade',
+            GAMEOVER: 'gameover'
+        };
+
+        let currentState = GAME_STATE.MENU;
+
+        // 玩家基本屬性
+        const player = {
+            x: 0,
+            y: 0,
+            radius: 15,
+            speed: 3.2,
+            hp: 100,
+            maxHp: 100,
+            shield: 10,
+            level: 1,
+            exp: 0,
+            nextLevelExp: 100,
+            score: 0,
+            wave: 1,
+            selectedWeapon: 0,
+            baseAtk: 1, // 對於 + / - 是基本的改動數值
+            fireRateMultiplier: 1.0,
+            moveSpeedMultiplier: 1.0,
+            facingAngle: 0
+        };
+
+        // 六大武器規格
+        const WEAPONS = [
+            { id: 0, name: '加法脈衝彈', op: '+', cd: 250, lastShot: 0, color: '#3b82f6', sound: 'shoot_plus' },
+            { id: 1, name: '減法衰變刃', op: '-', cd: 250, lastShot: 0, color: '#f43f5e', sound: 'shoot_minus' },
+            { id: 2, name: '乘法倍增器', op: '×', cd: 380, lastShot: 0, color: '#fbbf24', sound: 'shoot_mul' },
+            { id: 3, name: '平方共振砲', op: '²', cd: 600, lastShot: 0, color: '#a855f7', sound: 'shoot_square' },
+            { id: 4, name: '根號開方光束', op: '√', cd: 400, lastShot: 0, color: '#10b981', sound: 'shoot_sqrt' },
+            { id: 5, name: '西格瑪聚合鏈', op: '∑', cd: 500, lastShot: 0, color: '#e879f9', sound: 'shoot_sigma' }
+        ];
+
+        // 陣列與容器
+        let projectiles = [];
+        let enemies = [];
+        let particles = [];
+        let floatTexts = [];
+        let keys = {};
+        let mouse = { x: 0, y: 0, isDown: false };
+        let touchMoveDir = { x: 0, y: 0 };
+        let autoAim = true;
+
+        // Sigma 標記對象
+        let sigmaMarkedEnemy = null;
+
+        // 生成波次定時
+        let waveTimer = 0;
+        let waveInterval = 30000; // 每波 30 秒
+        let spawnTimer = 0;
+        let spawnInterval = 5000; // 初始每 5.0 秒生成一隻數字怪物 (已調整為5秒)
+
+        // 完全平方數快速驗證
+        const PERFECT_SQUARES = new Set([4, 9, 16, 25, 36, 49, 64, 81, 100, 121, 144, 169, 196, 225]);
+
+        function isPerfectSquare(num) {
+            return PERFECT_SQUARES.has(num);
+        }
+
+        // --- 輸入控制事件監聽 ---
+        window.addEventListener('keydown', (e) => {
+            keys[e.key.toLowerCase()] = true;
+            if (e.key >= '1' && e.key <= '6') {
+                const index = parseInt(e.key) - 1;
+                selectWeapon(index);
+            }
+        });
+        window.addEventListener('keyup', (e) => {
+            keys[e.key.toLowerCase()] = false;
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            mouse.x = e.clientX - rect.left;
+            mouse.y = e.clientY - rect.top;
+        });
+
+        canvas.addEventListener('mousedown', (e) => {
+            if (currentState === GAME_STATE.PLAYING) {
+                mouse.isDown = true;
+                document.getElementById('tutorialOverlay').style.opacity = '0.2';
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            mouse.isDown = false;
+        });
+
+        // 觸控控制（虛擬搖桿）
+        const joystickZone = document.getElementById('joystickZone');
+        const joystickKnob = document.getElementById('joystickKnob');
+
+        joystickZone.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            handleTouch(e);
+        }, { passive: false });
+
+        joystickZone.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            handleTouch(e);
+        }, { passive: false });
+
+        joystickZone.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            joystickKnob.style.transform = `translate(0px, 0px)`;
+            touchMoveDir = { x: 0, y: 0 };
+        }, { passive: false });
+
+        function handleTouch(e) {
+            const touch = e.touches[0];
+            const rect = joystickZone.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            let dx = touch.clientX - centerX;
+            let dy = touch.clientY - centerY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const maxDistance = rect.width / 2;
+
+            if (distance > 0) {
+                dx /= distance;
+                dy /= distance;
+                const cappedDistance = Math.min(distance, maxDistance);
+                joystickKnob.style.transform = `translate(${dx * cappedDistance * 0.7}px, ${dy * cappedDistance * 0.7}px)`;
+                touchMoveDir = { x: dx, y: dy };
+                if (autoAim) {
+                    mouse.isDown = true;
+                }
+            }
+        }
+
+        canvas.addEventListener('touchstart', (e) => {
+            if (currentState === GAME_STATE.PLAYING) {
+                const touch = e.touches[0];
+                const rect = canvas.getBoundingClientRect();
+                mouse.x = touch.clientX - rect.left;
+                mouse.y = touch.clientY - rect.top;
+                mouse.isDown = true;
+                document.getElementById('tutorialOverlay').style.opacity = '0.2';
+            }
+        }, { passive: true });
+
+        canvas.addEventListener('touchmove', (e) => {
+            if (currentState === GAME_STATE.PLAYING) {
+                const touch = e.touches[0];
+                const rect = canvas.getBoundingClientRect();
+                mouse.x = touch.clientX - rect.left;
+                mouse.y = touch.clientY - rect.top;
+            }
+        }, { passive: true });
+
+        canvas.addEventListener('touchend', () => {
+            if (!autoAim) {
+                mouse.isDown = false;
+            }
+        }, { passive: true });
+
+        // --- 核心武器選擇與狀態更新 ---
+        function selectWeapon(index) {
+            if (index < 0 || index >= WEAPONS.length) return;
+            player.selectedWeapon = index;
+            
+            // 更新 UI 狀態
+            for (let i = 0; i < WEAPONS.length; i++) {
+                const btn = document.getElementById(`wpBtn-${i}`);
+                if (i === index) {
+                    btn.classList.add('border-blue-500', 'bg-slate-800');
+                    btn.classList.remove('border-transparent', 'bg-slate-800/50');
+                } else {
+                    btn.classList.remove('border-blue-500', 'bg-slate-800');
+                    btn.classList.add('border-transparent', 'bg-slate-800/50');
+                }
+            }
+            playSound(WEAPONS[index].sound);
+        }
+
+        function toggleAutoAim() {
+            autoAim = !autoAim;
+            const btn = document.getElementById('autoAimBtn');
+            if (autoAim) {
+                btn.innerHTML = `<i class="fas fa-crosshairs"></i> 自動瞄準: 開`;
+                btn.className = "text-emerald-400";
+            } else {
+                btn.innerHTML = `<i class="fas fa-crosshairs"></i> 自動瞄準: 關`;
+                btn.className = "text-slate-400";
+            }
+        }
+
+        document.getElementById('soundToggle').addEventListener('click', () => {
+            soundEnabled = !soundEnabled;
+            const btn = document.getElementById('soundToggle');
+            if (soundEnabled) {
+                btn.innerHTML = `<i id="soundIcon" class="fas fa-volume-up"></i> 音效: 開`;
+            } else {
+                btn.innerHTML = `<i id="soundIcon" class="fas fa-volume-mute"></i> 音效: 關`;
+            }
+        });
+
+        // --- 視覺與粒子類別定義 ---
+        class FloatText {
+            constructor(x, y, text, color, fontScale = 1.0) {
+                this.x = x;
+                this.y = y;
+                this.text = text;
+                this.color = color;
+                this.alpha = 1.0;
+                this.vx = (Math.random() - 0.5) * 1.2;
+                this.vy = -1.2 - Math.random() * 1.2;
+                this.life = 65;
+                this.fontScale = fontScale;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life--;
+                this.alpha = Math.max(0, this.life / 65);
+            }
+
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.alpha;
+                ctx.font = `black ${Math.round(13 * this.fontScale)}px "Share Tech Mono"`;
+                ctx.fillStyle = this.color;
+                ctx.strokeStyle = '#020617';
+                ctx.lineWidth = 3;
+                ctx.strokeText(this.text, this.x, this.y);
+                ctx.fillText(this.text, this.x, this.y);
+                ctx.restore();
+            }
+        }
+
+        class Particle {
+            constructor(x, y, color, extraSpeed = 0) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.radius = Math.random() * 2.5 + 1;
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 3.2 + 0.8 + extraSpeed;
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
+                this.life = 25 + Math.random() * 15;
+                this.maxLife = this.life;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life--;
+                return this.life > 0;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.life / this.maxLife;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        // --- 子彈類別定義 ---
+        class Projectile {
+            constructor(x, y, angle, type, parentAngle = 0) {
+                this.x = x;
+                this.y = y;
+                this.angle = angle;
+                this.type = type; // 0: +, 1: -, 2: *, 3: ², 4: √, 5: ∑
+                this.speed = 7.5;
+                this.radius = 8;
+                this.vx = Math.cos(angle) * this.speed;
+                this.vy = Math.sin(angle) * this.speed;
+                this.color = WEAPONS[type].color;
+                this.op = WEAPONS[type].op;
+                this.life = 100; // 子彈生命週期
+                this.isDead = false;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life--;
+                return this.life > 0 && !this.isDead;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = this.color;
+                
+                // 畫出符號子彈
+                ctx.fillStyle = this.color;
+                ctx.font = `900 ${this.radius * 2}px "Share Tech Mono"`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(this.op, this.x, this.y);
+                ctx.restore();
+            }
+        }
+
+        // --- 數字怪物類別定義 ---
+        class Enemy {
+            constructor(x, y, baseValue) {
+                this.id = Math.random().toString(36).substr(2, 9);
+                this.x = x;
+                this.y = y;
+                this.value = baseValue; // 怪物當前的數學代數數值 (即HP)
+                this.maxValue = baseValue;
+                this.radius = 18 + Math.min(15, baseValue * 0.15); // 體積隨數值縮放
+                this.speed = Math.max(0.6, 1.6 - (baseValue * 0.005)); // 數值極大的走得慢
+                this.flashTime = 0;
+                this.baseColor = this.getUniqueColor(baseValue);
+                this.bounceOffset = Math.random() * Math.PI * 2; // 用於可愛的漂浮呼吸律動
+
+                // 用於 ∑ 合併時的物理引力拉扯
+                this.targetMergeEnemy = null;
+                this.isMerging = false;
+            }
+
+            getUniqueColor(num) {
+                // 根據奇偶數與數值大小給予亮麗的霓虹色彩
+                if (num % 2 === 0) {
+                    return `hsl(${(num * 13) % 360}, 90%, 65%)`;
+                } else {
+                    return `hsl(${(num * 27) % 360}, 95%, 70%)`;
+                }
+            }
+
+            update() {
+                if (this.flashTime > 0) this.flashTime--;
+
+                // 如果正在執行西格瑪合併引力拉扯
+                if (this.isMerging && this.targetMergeEnemy) {
+                    const dx = this.targetMergeEnemy.x - this.x;
+                    const dy = this.targetMergeEnemy.y - this.y;
+                    const dist = Math.hypot(dx, dy);
+
+                    if (dist > 8) {
+                        // 快速吸過去
+                        this.x += (dx / dist) * 8.0;
+                        this.y += (dy / dist) * 8.0;
+                        // 旋轉粒子特效
+                        if (Math.random() < 0.3) {
+                            createExplosion(this.x, this.y, '#e879f9', 1);
+                        }
+                    } else {
+                        // 相撞融合！
+                        mergeEnemies(this, this.targetMergeEnemy);
+                    }
+                    return;
+                }
+
+                // 朝向玩家移動
+                const angle = Math.atan2(player.y - this.y, player.x - this.x);
+                this.x += Math.cos(angle) * this.speed;
+                this.y += Math.sin(angle) * this.speed;
+
+                // 更新半徑 (避免數字變太大超出螢幕)
+                this.radius = 18 + Math.min(18, this.value * 0.15);
+            }
+
+            draw() {
+                ctx.save();
+                
+                // 動態呼吸彈性形變
+                const breath = Math.sin(Date.now() * 0.005 + this.bounceOffset) * 0.06;
+                const radiusX = this.radius * (1 + breath);
+                const radiusY = this.radius * (1 - breath);
+
+                // 完全平方數判定 ── 身體發出奪目的金光
+                const perfect = isPerfectSquare(this.value);
+
+                if (perfect) {
+                    ctx.shadowBlur = 18;
+                    ctx.shadowColor = '#eab308';
+                    ctx.fillStyle = '#eab308';
+                    ctx.strokeStyle = '#fef08a';
+                } else {
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = this.baseColor;
+                    ctx.fillStyle = this.flashTime > 0 ? '#ffffff' : this.baseColor;
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+                }
+
+                // 畫出怪獸實體 (帶有些許圓角的幾何形體)
+                ctx.beginPath();
+                ctx.ellipse(this.x, this.y, radiusX, radiusY, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // 畫出可愛的怪獸大眼睛
+                ctx.fillStyle = '#0f172a';
+                const eyeOffset = radiusX * 0.28;
+                // 左眼
+                ctx.beginPath();
+                ctx.arc(this.x - eyeOffset, this.y - radiusY * 0.15, radiusX * 0.2, 0, Math.PI * 2);
+                ctx.fill();
+                // 右眼
+                ctx.beginPath();
+                ctx.arc(this.x + eyeOffset, this.y - radiusY * 0.15, radiusX * 0.2, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 眼中亮點 (瞳孔)
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(this.x - eyeOffset - 1, this.y - radiusY * 0.15 - 1, radiusX * 0.07, 0, Math.PI * 2);
+                ctx.arc(this.x + eyeOffset - 1, this.y - radiusY * 0.15 - 1, radiusX * 0.07, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 西格瑪鎖定光環
+                if (sigmaMarkedEnemy === this) {
+                    ctx.strokeStyle = '#e879f9';
+                    ctx.lineWidth = 3;
+                    ctx.setLineDash([4, 4]);
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius + 10, 0, Math.PI * 2);
+                    ctx.stroke();
+                    
+                    // 繪製 "∑" 標誌浮動
+                    ctx.fillStyle = '#e879f9';
+                    ctx.font = 'bold 12px "Share Tech Mono"';
+                    ctx.fillText('∑ TARGET', this.x, this.y - this.radius - 12);
+                }
+
+                // 畫出核心數字標籤
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = '#0f172a'; // 與外殼做對比
+                ctx.font = 'bold 16px "Share Tech Mono"';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(this.value, this.x, this.y + radiusY * 0.25);
+
+                ctx.restore();
+            }
+        }
+
+        // --- 核心代數運算與跳字引擎 (重要策略邏輯) ---
+        function applyMathEffect(enemy, proj) {
+            const oldVal = enemy.value;
+            let newVal = oldVal;
+            let opColor = proj.color;
+            let expr = "";
+
+            enemy.flashTime = 6;
+
+            switch(proj.type) {
+                case 0: // 加法: 讓敵人數字 +1
+                    newVal = oldVal + 1;
+                    expr = `${oldVal} + 1 = ${newVal}`;
+                    break;
+                case 1: // 減法: 讓敵人數字 -1
+                    newVal = oldVal - 1;
+                    expr = `${oldVal} - 1 = ${newVal}`;
+                    break;
+                case 2: // 乘法: 翻倍
+                    newVal = oldVal * 2;
+                    expr = `${oldVal} × 2 = ${newVal}`;
+                    break;
+                case 3: // 平方:
+                    newVal = oldVal * oldVal;
+                    expr = `${oldVal}² = ${newVal}`;
+                    break;
+                case 4: // 根號: 開根號取整數(無條件捨去)
+                    newVal = Math.floor(Math.sqrt(oldVal));
+                    expr = `√${oldVal} ➔ ${newVal}`;
+                    break;
+                case 5: // 西格瑪聚合鏈: 標記、拉扯、合併！
+                    handleSigmaSelection(enemy);
+                    return; // Sigma 有獨立邏輯，不在此完成
+            }
+
+            // 更新數值並產生跳字
+            enemy.value = newVal;
+            
+            // 粒子爆發
+            createExplosion(enemy.x, enemy.y, opColor, 6);
+            playSound('hit');
+
+            // 判斷是否為完全平方數，若加法後湊巧湊成完全平方數，發出慶祝音
+            if (isPerfectSquare(newVal) && !isPerfectSquare(oldVal)) {
+                playSound('perfect_square');
+                createExplosion(enemy.x, enemy.y, '#eab308', 12);
+                floatTexts.push(new FloatText(enemy.x, enemy.y - 28, `${expr} 🌟 (Perfect Square!)`, '#eab308', 1.25));
+            } else {
+                floatTexts.push(new FloatText(enemy.x, enemy.y - 18, expr, opColor, 1.1));
+            }
+
+            // 檢查消滅條件 (唯一條件：數字剛好為 0)
+            if (enemy.value === 0) {
+                onEnemyDefeated(enemy);
+            }
+        }
+
+        // --- 西格瑪 (∑) 連接與聚合演算 ---
+        function handleSigmaSelection(enemy) {
+            if (!sigmaMarkedEnemy) {
+                // 標記第一個敵人
+                sigmaMarkedEnemy = enemy;
+                playSound('sigma_link');
+                floatTexts.push(new FloatText(enemy.x, enemy.y - 20, "∑ 標記 A", '#e879f9', 1.1));
+            } else {
+                // 如果點擊了同一隻怪物
+                if (sigmaMarkedEnemy.id === enemy.id) {
+                    sigmaMarkedEnemy = null;
+                    playSound('hit');
+                    return;
+                }
+
+                // 標記第二個敵人，開始物理相吸合併
+                floatTexts.push(new FloatText(enemy.x, enemy.y - 20, "∑ 標記 B ➔ 合併！", '#e879f9', 1.1));
+                
+                // 設定拉扯狀態 (讓 A 向 B 移動合併)
+                sigmaMarkedEnemy.targetMergeEnemy = enemy;
+                sigmaMarkedEnemy.isMerging = true;
+
+                // 釋放標記指引
+                sigmaMarkedEnemy = null;
+                playSound('sigma_merge');
+            }
+        }
+
+        // --- 兩隻數字魔物碰撞加總融合 ---
+        function mergeEnemies(enemyA, enemyB) {
+            const sumVal = enemyA.value + enemyB.value;
+            const midX = (enemyA.x + enemyB.x) / 2;
+            const midY = (enemyA.y + enemyB.y) / 2;
+
+            // 產出一隻全新的融合大怪
+            const mergedMonster = new Enemy(midX, midY, sumVal);
+            enemies.push(mergedMonster);
+
+            // 清理掉 A 與 B
+            enemies = enemies.filter(e => e.id !== enemyA.id && e.id !== enemyB.id);
+
+            // 產生華麗的加法融合視覺
+            createExplosion(midX, midY, '#e879f9', 18);
+            playSound('sigma_merge');
+
+            // 飄起加總方程式
+            const text = `${enemyA.value} + ${enemyB.value} = ${sumVal}`;
+            floatTexts.push(new FloatText(midX, midY - 24, text, '#e879f9', 1.3));
+
+            // 特別檢查融合後是否剛好為完全平方數！
+            if (isPerfectSquare(sumVal)) {
+                setTimeout(() => {
+                    playSound('perfect_square');
+                    createExplosion(midX, midY, '#eab308', 12);
+                    floatTexts.push(new FloatText(midX, midY - 45, "∑ 湊成完全平方！✨", '#eab308', 1.3));
+                }, 150);
+            }
+        }
+
+        // --- 怪物精確為 0 被消滅事件 ---
+        function onEnemyDefeated(enemy) {
+            // 加分數
+            player.score += enemy.maxValue * 10;
+            player.exp += enemy.maxValue * 15;
+
+            // 大煙火爆破
+            createExplosion(enemy.x, enemy.y, enemy.baseColor, 18);
+            playSound('perfect_square');
+
+            // 浮空算式完成字
+            floatTexts.push(new FloatText(enemy.x, enemy.y - 12, "EVALUATED TO 0! ✓", '#34d399', 1.2));
+
+            // 如果被消滅的怪原本是 ∑ 被標記的那隻，則清空標記
+            if (sigmaMarkedEnemy === enemy) {
+                sigmaMarkedEnemy = null;
+            }
+
+            // 升級判定
+            if (player.exp >= player.nextLevelExp) {
+                levelUp();
+            }
+        }
+
+        function createExplosion(x, y, color, count) {
+            for (let i = 0; i < count; i++) {
+                particles.push(new Particle(x, y, color));
+            }
+        }
+
+        // --- 隨機在邊界外側生成帶有數值的怪物 ---
+        function spawnEnemy() {
+            let x, y;
+            const pad = 40;
+            const side = Math.floor(Math.random() * 4);
+            
+            if (side === 0) {
+                x = Math.random() * canvas.width;
+                y = -pad;
+            } else if (side === 1) {
+                x = canvas.width + pad;
+                y = Math.random() * canvas.height;
+            } else if (side === 2) {
+                x = Math.random() * canvas.width;
+                y = canvas.height + pad;
+            } else {
+                x = -pad;
+                y = Math.random() * canvas.height;
+            }
+
+            // 怪物數值設計：隨波次 (Wave) 生成隨機代數
+            // 基礎波次越往後，生成的數字越大
+            const minVal = Math.max(2, player.wave * 2 - 1);
+            const maxVal = player.wave * 8 + 6;
+            let val = Math.floor(Math.random() * (maxVal - minVal + 1)) + minVal;
+
+            // 偶爾生成剛好只差一步湊滿完全平方的怪物，提供玩家腦力考驗
+            if (Math.random() < 0.25) {
+                const targetSquares = [4, 9, 16, 25, 49];
+                const luckySq = targetSquares[Math.floor(Math.random() * targetSquares.length)];
+                val = luckySq - 1; // 需要玩家補一次 [+]
+            }
+
+            enemies.push(new Enemy(x, y, val));
+        }
+
+        // --- Roguelike 升級天賦 ---
+        const UPGRADE_POOL = [
+            { title: "防護定則：最大 HP +30", desc: "強化生命方程式，回復 40 HP", action: () => { player.maxHp += 30; player.hp = Math.min(player.maxHp, player.hp + 40); } },
+            { title: "分母優化：施法冷卻縮減 +15%", desc: "所有數學武器的冷卻發射間隔大幅縮短", action: () => { player.fireRateMultiplier *= 1.15; } },
+            { title: "等式加速：移動速度 +12%", desc: "提高角色的等式闪避極限", action: () => { player.moveSpeedMultiplier *= 1.12; } },
+            { title: "微積分重構：自動獲得護盾", desc: "立刻獲得 40 點傷害護盾", action: () => { player.shield = Math.min(100, player.shield + 40); } },
+            { title: "數值加載：初始經驗 +20%", desc: "獲取更高代數能級", action: () => { player.exp += 30; } }
+        ];
+
+        function levelUp() {
+            player.level++;
+            player.exp -= player.nextLevelExp;
+            player.nextLevelExp = Math.round(player.nextLevelExp * 1.3 + 40);
+
+            currentState = GAME_STATE.UPGRADE;
+            playSound('level_up');
+
+            const overlay = document.getElementById('upgradeOverlay');
+            overlay.classList.remove('hidden');
+
+            const optionsContainer = document.getElementById('upgradeOptions');
+            optionsContainer.innerHTML = '';
+
+            const shuffled = [...UPGRADE_POOL].sort(() => 0.5 - Math.random());
+            const selected = shuffled.slice(0, 3);
+
+            selected.forEach(card => {
+                const cardEl = document.createElement('div');
+                cardEl.className = 'bg-slate-800 hover:bg-slate-700/80 border border-slate-700 hover:border-yellow-400 p-4 rounded-xl cursor-pointer text-left transition-all hover:scale-[1.02] flex flex-col justify-between';
+                cardEl.innerHTML = `
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <h4 class="text-sm font-bold text-yellow-400 mb-1"><i class="fas fa-caret-right mr-1"></i> ${card.title}</h4>
+                            <p class="text-xs text-slate-300">${card.desc}</p>
+                        </div>
+                        <span class="text-[10px] text-yellow-500 font-mono font-bold">THEOREM</span>
+                    </div>
+                `;
+                cardEl.onclick = () => {
+                    card.action();
+                    overlay.classList.add('hidden');
+                    currentState = GAME_STATE.PLAYING;
+                };
+                optionsContainer.appendChild(cardEl);
+            });
+        }
+
+        // --- 遊戲生命週期控制器 ---
+        function startGame() {
+            document.getElementById('startOverlay').classList.add('hidden');
+            initGame();
+        }
+
+        function initGame() {
+            player.x = canvas.width / 2;
+            player.y = canvas.height / 2;
+            player.hp = 100;
+            player.maxHp = 100;
+            player.shield = 15;
+            player.level = 1;
+            player.exp = 0;
+            player.nextLevelExp = 100;
+            player.score = 0;
+            player.wave = 1;
+            player.fireRateMultiplier = 1.0;
+            player.moveSpeedMultiplier = 1.0;
+            player.selectedWeapon = 0;
+
+            projectiles = [];
+            enemies = [];
+            particles = [];
+            floatTexts = [];
+            keys = {};
+            sigmaMarkedEnemy = null;
+
+            waveTimer = 0;
+            spawnTimer = 0;
+            spawnInterval = 5000; // 初始每 5.0 秒生成一隻數字怪物 (已調整)
+
+            currentState = GAME_STATE.PLAYING;
+            selectWeapon(0);
+
+            if (audioCtx === null) {
+                audioCtx = new AudioContext();
+            }
+        }
+
+        function restartGame() {
+            document.getElementById('gameOverOverlay').classList.add('hidden');
+            initGame();
+        }
+
+        function triggerGameOver() {
+            currentState = GAME_STATE.GAMEOVER;
+            playSound('hurt');
+
+            document.getElementById('finalScore').innerText = player.score;
+            document.getElementById('finalWave').innerText = player.wave;
+            document.getElementById('gameOverOverlay').classList.remove('hidden');
+        }
+
+        // --- 核心物理更新循環與碰撞計算 (Game Loop) ---
+        function updateGame(deltaTime) {
+            if (currentState !== GAME_STATE.PLAYING) return;
+
+            // 1. 定時刷新波次與怪物
+            waveTimer += 16.67;
+            spawnTimer += 16.67;
+
+            if (waveTimer >= waveInterval) {
+                player.wave++;
+                waveTimer = 0;
+                // 提高刷怪速率 (隨著波次遞減，最快 1.5 秒一隻，給予玩家合理的成長難度)
+                spawnInterval = Math.max(1500, 5000 - player.wave * 300);
+                floatTexts.push(new FloatText(player.x, player.y - 30, `WAVE ${player.wave}: 難度倍增！`, '#34d399', 1.25));
+                playSound('level_up');
+            }
+
+            if (spawnTimer >= spawnInterval) {
+                spawnTimer = 0;
+                spawnEnemy();
+            }
+
+            // 2. 玩家移動計算
+            let mx = 0;
+            let my = 0;
+
+            if (keys['w'] || keys['arrowup']) my -= 1;
+            if (keys['s'] || keys['arrowdown']) my += 1;
+            if (keys['a'] || keys['arrowleft']) mx -= 1;
+            if (keys['d'] || keys['arrowright']) mx += 1;
+
+            if (touchMoveDir.x !== 0 || touchMoveDir.y !== 0) {
+                mx = touchMoveDir.x;
+                my = touchMoveDir.y;
+            }
+
+            if (mx !== 0 || my !== 0) {
+                const len = Math.hypot(mx, my);
+                const currentSpeed = player.speed * player.moveSpeedMultiplier;
+                player.x += (mx / len) * currentSpeed;
+                player.y += (my / len) * currentSpeed;
+
+                player.x = Math.max(player.radius, Math.min(canvas.width - player.radius, player.x));
+                player.y = Math.max(player.radius, Math.min(canvas.height - player.radius, player.y));
+            }
+
+            // 3. 瞄準與自動瞄準邏輯
+            let targetX = mouse.x;
+            let targetY = mouse.y;
+
+            if (autoAim && enemies.length > 0) {
+                let closest = enemies[0];
+                let minDist = Math.hypot(enemies[0].x - player.x, enemies[0].y - player.y);
+                for (let i = 1; i < enemies.length; i++) {
+                    const dist = Math.hypot(enemies[i].x - player.x, enemies[i].y - player.y);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        closest = enemies[i];
+                    }
+                }
+                targetX = closest.x;
+                targetY = closest.y;
+            }
+
+            player.facingAngle = Math.atan2(targetY - player.y, targetX - player.x);
+
+            // 4. 發射武器判定
+            if (mouse.isDown) {
+                const weapon = WEAPONS[player.selectedWeapon];
+                const now = Date.now();
+                const actualCd = weapon.cd / player.fireRateMultiplier;
+
+                if (now - weapon.lastShot >= actualCd) {
+                    weapon.lastShot = now;
+                    // 新增子彈
+                    projectiles.push(new Projectile(player.x, player.y, player.facingAngle, player.selectedWeapon));
+                    playSound(weapon.sound);
+                }
+            }
+
+            // 5. 更新子彈、力場、粒子
+            projectiles = projectiles.filter(p => p.update());
+            enemies.forEach(e => e.update());
+
+            // 6. 碰撞檢測 ── 子彈命中怪物
+            projectiles.forEach(p => {
+                enemies.forEach(e => {
+                    if (e.isMerging) return; // 正在合併中不受其他子彈干擾
+
+                    const dist = Math.hypot(p.x - e.x, p.y - e.y);
+                    if (dist < p.radius + e.radius) {
+                        applyMathEffect(e, p);
+                        p.isDead = true;
+                    }
+                });
+            });
+
+            // 清理已死亡怪物與已爆炸子彈
+            enemies = enemies.filter(e => e.value > 0);
+
+            // 7. 碰撞檢測 ── 怪物碰撞玩家
+            enemies.forEach(e => {
+                if (e.isMerging) return;
+
+                const dist = Math.hypot(e.x - player.x, e.y - player.y);
+                if (dist < e.radius + player.radius) {
+                    // 扣血 (傷害隨波次與怪物大數成正比)
+                    let dmg = Math.round(5 + player.wave * 1.5 + Math.min(20, e.value * 0.1));
+                    
+                    if (player.shield > 0) {
+                        player.shield -= dmg;
+                        if (player.shield < 0) {
+                            player.hp += player.shield;
+                            player.shield = 0;
+                        }
+                        floatTexts.push(new FloatText(player.x, player.y - 20, `🛡️ -${dmg}`, '#f43f5e'));
+                    } else {
+                        player.hp -= dmg;
+                        floatTexts.push(new FloatText(player.x, player.y - 20, `-${dmg} HP`, '#f43f5e'));
+                    }
+
+                    // 退彈反作用力
+                    const pushAngle = Math.atan2(player.y - e.y, player.x - e.x);
+                    player.x += Math.cos(pushAngle) * 12;
+                    player.y += Math.sin(pushAngle) * 12;
+
+                    playSound('hurt');
+                    createExplosion(player.x, player.y, '#f43f5e', 8);
+
+                    if (player.hp <= 0) {
+                        player.hp = 0;
+                        triggerGameOver();
+                    }
+                }
+            });
+
+            // 8. 視覺元素更新
+            particles = particles.filter(pt => pt.update());
+            floatTexts.forEach(ft => ft.update());
+            floatTexts = floatTexts.filter(ft => ft.life > 0);
+
+            // 9. UI 資料同步
+            document.getElementById('hpBar').style.width = `${(player.hp / player.maxHp) * 100}%`;
+            document.getElementById('hpText').innerText = `${player.hp}/${player.maxHp} HP ${player.shield > 0 ? `(+${player.shield} 🛡️)` : ''}`;
+            document.getElementById('expBar').style.width = `${(player.exp / player.nextLevelExp) * 100}%`;
+            document.getElementById('levelText').innerText = `Lv.${player.level}`;
+            document.getElementById('scoreText').innerText = player.score;
+            document.getElementById('waveText').innerText = player.wave;
+            document.getElementById('enemyCountText').innerText = enemies.length;
+        }
+
+        // --- 畫布繪製渲染模組 ---
+        function drawGame() {
+            ctx.fillStyle = '#06060c';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 繪製背景數學柵格線 (Grid Pattern)
+            ctx.save();
+            ctx.strokeStyle = 'rgba(30, 41, 59, 0.35)';
+            ctx.lineWidth = 1;
+            const gridSize = 45;
+            for (let x = 0; x < canvas.width; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+            ctx.restore();
+
+            // 繪製 ∑ 標記連接輔助虛線
+            if (sigmaMarkedEnemy) {
+                ctx.save();
+                ctx.strokeStyle = 'rgba(232, 121, 249, 0.5)';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(player.x, player.y);
+                ctx.lineTo(sigmaMarkedEnemy.x, sigmaMarkedEnemy.y);
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // 繪製粒子
+            particles.forEach(pt => pt.draw());
+
+            // 繪製子彈
+            projectiles.forEach(p => p.draw());
+
+            // 繪製怪物
+            enemies.forEach(e => e.draw());
+
+            // 繪製玩家數學勇士本體
+            if (currentState === GAME_STATE.PLAYING) {
+                ctx.save();
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = '#3b82f6';
+
+                // 外環護盾罩
+                if (player.shield > 0) {
+                    ctx.strokeStyle = 'rgba(244, 63, 94, 0.7)';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(player.x, player.y, player.radius + 6, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+
+                // 核心圓環
+                ctx.fillStyle = '#3b82f6';
+                ctx.beginPath();
+                ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 亮白晶片核心
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(player.x, player.y, player.radius * 0.45, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 指向性手槍方向器
+                ctx.strokeStyle = WEAPONS[player.selectedWeapon].color;
+                ctx.lineWidth = 5;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(player.x, player.y);
+                ctx.lineTo(player.x + Math.cos(player.facingAngle) * 23, player.y + Math.sin(player.facingAngle) * 23);
+                ctx.stroke();
+
+                ctx.restore();
+            }
+
+            // 繪製漂浮公式字
+            floatTexts.forEach(ft => ft.draw());
+        }
+
+        // --- 核心幀渲染時脈與初始化 ---
+        let lastTime = 0;
+        function gameLoop(timestamp) {
+            if (!lastTime) lastTime = timestamp;
+            const elapsed = timestamp - lastTime;
+            lastTime = timestamp;
+
+            updateGame(elapsed);
+            drawGame();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        window.onload = function() {
+            requestAnimationFrame(gameLoop);
+        };
+    </script>
+</body>
+</html>
